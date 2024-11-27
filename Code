@@ -1,0 +1,133 @@
+from machine import Pin, PWM  # import the Pin and PWM modules from the machine library
+from utime import sleep  # import the sleep module from the utime library
+
+# Define IR sensor pins as inputs
+ir_pins = [Pin(i, Pin.IN) for i in range(5)]  # Using pins 0 to 4 for IR sensors
+
+# Define motor driver pins and PWM channels
+ain1 = Pin(PIN, Pin.OUT)  # Motor A direction control (left motor)
+ain2 = Pin(PIN, Pin.OUT)  # Motor A direction control (left motor)
+bin1 = Pin(PIN, Pin.OUT)  # Motor B direction control (right motor)
+bin2 = Pin(PIN, Pin.OUT)  # Motor B direction control (right motor)
+pwm_a = PWM(Pin(PIN))     # PWM for Motor A speed control
+pwm_b = PWM(Pin(PIN))     # PWM for Motor B speed control
+pwm_a.freq(1000)         # Set PWM frequency for Motor A
+pwm_b.freq(1000)         # Set PWM frequency for Motor B
+
+# Set default motor speed
+speed = 45000  # Speed value (adjustable)
+
+def read_sensors():
+    """
+    Reads the values from all IR sensors.
+    Returns:
+        list: A list of sensor values where 1 indicates no line and 0 indicates line detected.
+    """
+    values = [pin.value() for pin in ir_pins]
+    return values
+
+def set_motor_speed(left_speed, right_speed):
+    """
+    Sets the speed and direction of the motors.
+    Args:
+        left_speed (int): Speed of the left motor. Positive values move forward, negative values move backward.
+        right_speed (int): Speed of the right motor. Positive values move forward, negative values move backward.
+    """
+    # Control Motor A (left motor)
+    if left_speed > 0:
+        ain1.on()   # Set direction to forward
+        ain2.off()  # Stop backward direction
+    else:
+        ain1.off()  # Stop forward direction
+        ain2.on()   # Set direction to backward
+    pwm_a.duty_u16(int(min(abs(left_speed), 65535)))  # Set speed for Motor A
+
+    # Control Motor B (right motor)
+    if right_speed > 0:
+        bin1.on()   # Set direction to forward
+        bin2.off()  # Stop backward direction
+    else:
+        bin1.off()  # Stop forward direction
+        bin2.on()   # Set direction to backward
+    pwm_b.duty_u16(int(min(abs(right_speed), 65535)))  # Set speed for Motor B
+
+def stop():
+    """
+    Stops both motors.
+    """
+    ain1.off()
+    ain2.off()
+    bin1.off()
+    bin2.off()
+    pwm_a.duty_u16(0)
+    pwm_b.duty_u16(0)
+
+def forward():
+    """
+    Moves the robot forward.
+    """
+    set_motor_speed(speed, speed)
+
+def turn_left():
+    """
+    Turns the robot left.
+    """
+    set_motor_speed(-speed // 2, speed)
+
+def turn_right():
+    """
+    Turns the robot right.
+    """
+    set_motor_speed(speed, -speed // 2)
+
+def line_follower_logic():
+    """
+    Determines the motor speed and direction based on sensor values.
+    """
+    sensor_values = read_sensors()
+    print("Sensor values:", sensor_values)  # Debug print
+    
+    inverted_sensor_values = [1 - val for val in sensor_values]
+    print("Inverted sensor values:", inverted_sensor_values)  # Debug print
+    
+    # Check for sharp turn conditions
+    if ((inverted_sensor_values[0] == 1 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 0 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 0) or
+        (inverted_sensor_values[0] == 1 and inverted_sensor_values[1] == 1 and inverted_sensor_values[2] == 0 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 0) or
+        (inverted_sensor_values[0] == 1 and inverted_sensor_values[1] == 1 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 0) or
+        (inverted_sensor_values[0] == 1 and inverted_sensor_values[1] == 1 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 1 and inverted_sensor_values[4] == 0)):
+        print("Sharp left turn")
+        set_motor_speed(-30000, 30000)  # Sharp left turn
+        
+    elif ((inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 0 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 1) or
+          (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 1 and inverted_sensor_values[4] == 1) or
+          (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 1 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 1 and inverted_sensor_values[4] == 1)):
+        print("Sharp right turn")
+        set_motor_speed(30000, -30000)
+        
+    elif (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 0):
+        print("Straight")
+        set_motor_speed(55000, 55000)
+        
+    elif (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 1 and inverted_sensor_values[4] == 0):
+        print("Slight left")
+        set_motor_speed(25000, 50000)
+        
+    elif (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 1 and inverted_sensor_values[2] == 1 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 0):
+        print("Slight right")
+        set_motor_speed(50000, 25000)
+
+    elif (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 1 and inverted_sensor_values[2] == 0 and inverted_sensor_values[3] == 0 and inverted_sensor_values[4] == 0):
+        print("Left")
+        set_motor_speed(20000, 50000)
+        
+    elif (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 0 and inverted_sensor_values[3] == 1 and inverted_sensor_values[4] == 0):
+        print("Right")
+        set_motor_speed(50000, 20000)
+        
+    elif (inverted_sensor_values[0] == 0 and inverted_sensor_values[1] == 0 and inverted_sensor_values[2] == 0 and inverted_sensor_values[3] == 1 and inverted_sensor_values[4] == 1):
+        print("Harder right")
+        set_motor_speed(50000, 20000)
+
+while True:
+    line_follower_logic()
+    sleep(0.05)  # Small delay to allow sensor reading stability
